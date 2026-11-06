@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Entrevistas - Kanban</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        .kanban-column {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            min-height: 70vh;
+            border: 1px solid #dee2e6;
+        }
+        .kanban-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .kanban-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- Navbar Superior -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="bi bi-journal-check"></i> Portal de Entrevistas</a>
+            <div class="d-flex text-white align-items-center">
+                <span class="me-3"><i class="bi bi-people-fill"></i> Dupla: <strong id="duplaNombre">Cargando...</strong></span>
+                <button class="btn btn-outline-light btn-sm" id="btnCerrarSesion">Salir</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid my-4">
+        <!-- Panel de Métricas / Resumen -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-primary text-white">
+                    <div class="card-body">
+                        <h6 class="card-title text-uppercase">Candidatos Asignados Hoy</h6>
+                        <h2 class="display-6 fw-bold mb-0" id="metricTotal">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-warning text-dark">
+                    <div class="card-body">
+                        <h6 class="card-title text-uppercase">Pendientes / En Curso</h6>
+                        <h2 class="display-6 fw-bold mb-0" id="metricPendientes">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-success text-white">
+                    <div class="card-body">
+                        <h6 class="card-title text-uppercase">Entrevistas Completadas</h6>
+                        <h2 class="display-6 fw-bold mb-0" id="metricCompletadas">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtro por Fecha -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <label for="filtroFecha" class="form-label fw-bold">Fecha de Entrevista:</label>
+                <input type="date" id="filtroFecha" class="form-control shadow-sm">
+            </div>
+        </div>
+
+        <!-- Tablero Kanban -->
+        <div class="row g-4">
+            <!-- Columna: Pendientes -->
+            <div class="col-md-4">
+                <div class="p-3 kanban-column">
+                    <h5 class="text-secondary border-bottom pb-2 mb-3">
+                        <i class="bi bi-clock-history"></i> Pendientes <span class="badge bg-secondary float-end" id="countPendiente">0</span>
+                    </h5>
+                    <div id="columnaPendiente" class="d-flex flex-column gap-3">
+                        <!-- Las tarjetas se inyectan por JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna: En Proceso -->
+            <div class="col-md-4">
+                <div class="p-3 kanban-column">
+                    <h5 class="text-warning border-bottom pb-2 mb-3">
+                        <i class="bi bi-play-circle"></i> En Proceso <span class="badge bg-warning text-dark float-end" id="countProceso">0</span>
+                    </h5>
+                    <div id="columnaProceso" class="d-flex flex-column gap-3">
+                        <!-- Las tarjetas se inyectan por JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna: Completadas -->
+            <div class="col-md-4">
+                <div class="p-3 kanban-column">
+                    <h5 class="text-success border-bottom pb-2 mb-3">
+                        <i class="bi bi-check-circle"></i> Completadas <span class="badge bg-success float-end" id="countCompletada">0</span>
+                    </h5>
+                    <div id="columnaCompletada" class="d-flex flex-column gap-3">
+                        <!-- Las tarjetas se inyectan por JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Inicializar input de fecha con el día actual
+    const inputFecha = document.getElementById("filtroFecha");
+    const today = new Date().toISOString().split('T')[0];
+    inputFecha.value = today;
+
+    // Cargar datos al iniciar y al cambiar la fecha
+    cargarTableroKanban(inputFecha.value);
+
+    inputFecha.addEventListener("change", (e) => {
+        cargarTableroKanban(e.target.value);
+    });
+});
+
+/**
+ * Petición AJAX para obtener las entrevistas de la fecha seleccionada
+ */
+async function cargarTableroKanban(fecha) {
+    try {
+        // Endpoint sugerido en CodeIgniter 4: /api/entrevistas?fecha=YYYY-MM-DD
+        const response = await fetch(`/api/entrevistas?fecha=${fecha}`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) throw new Error('Error al conectar con el servidor.');
+
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            renderizarKanban(data.entrevistas);
+            actualizarMetricas(data.metricas);
+            document.getElementById('duplaNombre').textContent = data.dupla || 'Dupla Activa';
+        } else {
+            console.warn("Aviso del servidor:", data.message);
+        }
+
+    } catch (error) {
+        console.error("Error AJAX:", error);
+        alert("No se pudieron cargar las entrevistas para esta fecha.");
+    }
+}
+
+/**
+ * Distribuye las tarjetas en las columnas del Kanban según su estado
+ */
+function renderizarKanban(entrevistas) {
+    const colPendiente = document.getElementById("columnaPendiente");
+    const colProceso = document.getElementById("columnaProceso");
+    const colCompletada = document.getElementById("columnaCompletada");
+
+    // Limpiar contenedores
+    colPendiente.innerHTML = '';
+    colProceso.innerHTML = '';
+    colCompletada.innerHTML = '';
+
+    let contPendiente = 0;
+    let contProceso = 0;
+    let contCompletada = 0;
+
+    entrevistas.forEach(item => {
+        const cardHTML = `
+            <div class="card kanban-card shadow-sm border-0" data-id="${item.id}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge bg-light text-dark border"><i class="bi bi-clock"></i> ${item.hora}</span>
+                        <small class="text-muted">ID: #${item.candidato_id}</small>
+                    </div>
+                    <h6 class="card-title fw-bold text-primary mb-1">${item.nombre_candidato}</h6>
+                    <p class="card-text text-muted small mb-3">Vacante: ${item.vacante}</p>
+                    <div class="d-grid">
+                        <button class="btn btn-outline-primary btn-sm" onclick="abrirEditorEntrevista(${item.id}, '${item.estado}')">
+                            <i class="bi bi-pencil-square"></i> ${item.estado === 'completada' ? 'Ver Evaluación' : 'Iniciar / Editar'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (item.estado === 'pendiente') {
+            colPendiente.insertAdjacentHTML('beforeend', cardHTML);
+            contPendiente++;
+        } else if (item.estado === 'proceso') {
+            colProceso.insertAdjacentHTML('beforeend', cardHTML);
+            contProceso++;
+        } else if (item.estado === 'completada') {
+            colCompletada.insertAdjacentHTML('beforeend', cardHTML);
+            contCompletada++;
+        }
+    });
+
+    // Actualizar contadores de las columnas
+    document.getElementById('countPendiente').textContent = contPendiente;
+    document.getElementById('countProceso').textContent = contProceso;
+    document.getElementById('countCompletada').textContent = contCompletada;
+}
+
+function actualizarMetricas(metricas) {
+    if (!metricas) return;
+    document.getElementById('metricTotal').textContent = metricas.total || 0;
+    document.getElementById('metricPendientes').textContent = metricas.pendientes || 0;
+    document.getElementById('metricCompletadas').textContent = metricas.completadas || 0;
+}
+
+/**
+ * Función disparadora al dar clic en evaluar/ver
+ */
+function abrirEditorEntrevista(entrevistaId, estado) {
+    // Aquí puedes abrir tu modal de Bootstrap o redirigir a la vista del editor asociado al Excel
+    console.log(`Abriendo entrevista ID: ${entrevistaId} con estado: ${estado}`);
+    // Ejemplo: var myModal = new bootstrap.Modal(document.getElementById('modalEditor')); myModal.show();
+}
+</script>
+</html>
